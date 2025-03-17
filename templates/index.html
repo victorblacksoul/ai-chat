@@ -1,0 +1,995 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Assistant Chat</title>
+    <!-- Add Marked.js for Markdown parsing -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Add highlight.js for code syntax highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/styles/github.min.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.7.0/highlight.min.js"></script>
+    <style>
+        :root {
+            --whatsapp-green: #25D366;
+            --whatsapp-light-green: #DCF8C6;
+            --whatsapp-blue: #34B7F1;
+            --whatsapp-bg: #E5DDD5;
+            --whatsapp-header: #075E54;
+            --user-msg-bg: #D9FDD3;
+            --assistant-msg-bg: #FFFFFF;
+            --chat-bg: #E5DDD5;
+            --input-bg: #FFFFFF;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background-color: #f0f2f5;
+            color: #333;
+            line-height: 1.6;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .app-container {
+            width: 100%;
+            max-width: 1000px;
+            margin: 0 auto;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-color: white;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.24);
+        }
+        
+        .chat-header {
+            background-color: var(--whatsapp-header);
+            color: white;
+            padding: 15px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .chat-header h1 {
+            font-size: 18px;
+            font-weight: 500;
+        }
+        
+        .thread-info {
+            display: flex;
+            align-items: center;
+            font-size: 14px;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        
+        .thread-info-label {
+            margin-right: 5px;
+        }
+        
+        .chat-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--chat-bg);
+            background-image: url('https://web.whatsapp.com/img/bg-chat-tile-light_a4be8c63045ee0be9cbc43ab5f80ca7c.png');
+            background-repeat: repeat;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            scroll-behavior: smooth;
+        }
+        
+        .message {
+            max-width: 65%;
+            margin-bottom: 12px;
+            border-radius: 7.5px;
+            padding: 8px 12px;
+            position: relative;
+            animation: fadeIn 0.3s ease-in-out;
+            box-shadow: 0 1px 0.5px rgba(0, 0, 0, 0.13);
+            word-wrap: break-word;
+        }
+        
+        .user-message {
+            background-color: var(--user-msg-bg);
+            margin-left: auto;
+            border-top-right-radius: 0;
+        }
+        
+        .user-message:after {
+            content: "";
+            position: absolute;
+            top: 0;
+            right: -8px;
+            width: 0;
+            height: 0;
+            border-top: 8px solid var(--user-msg-bg);
+            border-right: 8px solid transparent;
+        }
+        
+        .assistant-message {
+            background-color: var(--assistant-msg-bg);
+            margin-right: auto;
+            border-top-left-radius: 0;
+        }
+        
+        .assistant-message:after {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: -8px;
+            width: 0;
+            height: 0;
+            border-top: 8px solid var(--assistant-msg-bg);
+            border-left: 8px solid transparent;
+        }
+        
+        .message-timestamp {
+            font-size: 11px;
+            color: #999;
+            text-align: right;
+            margin-top: 4px;
+            display: block;
+        }
+        
+        /* Animated typing indicator */
+        .typing-indicator {
+            display: flex;
+            align-items: center;
+            height: 18px;
+            margin-bottom: 10px;
+        }
+        
+        .typing-indicator span {
+            height: 8px;
+            width: 8px;
+            background-color: #93a5ad;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 4px;
+            animation: bounce 1.5s infinite ease-in-out;
+        }
+        
+        .typing-indicator span:nth-child(1) {
+            animation-delay: -0.32s;
+        }
+        
+        .typing-indicator span:nth-child(2) {
+            animation-delay: -0.16s;
+        }
+        
+        @keyframes bounce {
+            0%, 80%, 100% { transform: scale(0); }
+            40% { transform: scale(1); }
+        }
+        
+        /* Character-by-character typing animation */
+        .typewriter-text {
+            overflow: hidden;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+        
+        .cursor-blink {
+            display: inline-block;
+            width: 2px;
+            height: 18px;
+            background-color: #333;
+            animation: blink 0.8s infinite;
+            vertical-align: middle;
+            margin-top: -4px;
+            margin-left: 2px;
+        }
+        
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+        
+        /* Formatted message content styling */
+        .message-content {
+            width: 100%;
+            color: #303030;
+        }
+        
+        .message-content p {
+            margin: 0 0 10px 0;
+        }
+        
+        .message-content p:last-child {
+            margin-bottom: 0;
+        }
+        
+        .message-content pre {
+            background-color: rgba(0, 0, 0, 0.03);
+            border-radius: 4px;
+            padding: 10px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        
+        .message-content code {
+            font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+            font-size: 0.85em;
+            padding: 2px 4px;
+            border-radius: 3px;
+            background-color: rgba(0, 0, 0, 0.03);
+        }
+        
+        .message-content pre code {
+            padding: 0;
+            background-color: transparent;
+        }
+        
+        .message-content ul, .message-content ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        
+        .message-content blockquote {
+            margin: 10px 0;
+            padding-left: 10px;
+            border-left: 4px solid rgba(0,0,0,0.1);
+            color: #555;
+        }
+        
+        .controls-area {
+            background-color: #EDEDED;
+            padding: 10px;
+            border-top: 1px solid #D8D8D8;
+        }
+        
+        .thread-controls {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            align-items: center;
+        }
+        
+        .thread-controls input {
+            flex: 1;
+            padding: 10px;
+            border: 1px solid #D8D8D8;
+            border-radius: 20px;
+            font-size: 14px;
+            background-color: var(--input-bg);
+            outline: none;
+        }
+        
+        .thread-controls input:disabled {
+            background-color: #F5F5F5;
+            color: #999;
+            cursor: not-allowed;
+        }
+        
+        .thread-controls button, .new-thread-btn {
+            border: none;
+            background-color: var(--whatsapp-header);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 20px;
+            cursor: pointer;
+            font-size: 14px;
+            outline: none;
+            transition: background-color 0.2s;
+        }
+        
+        .thread-controls button:hover, .new-thread-btn:hover {
+            background-color: #064942;
+        }
+        
+        .thread-controls button:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+        }
+        
+        .input-area {
+            display: flex;
+            align-items: center;
+            background-color: var(--input-bg);
+            border-radius: 20px;
+            overflow: hidden;
+            padding: 5px 10px;
+        }
+        
+        .input-area textarea {
+            flex: 1;
+            padding: 8px;
+            border: none;
+            border-radius: 0;
+            resize: none;
+            font-size: 15px;
+            outline: none;
+            background-color: transparent;
+            min-height: 24px;
+            max-height: 100px;
+            font-family: inherit;
+        }
+        
+        .send-btn {
+            background-color: var(--whatsapp-header);
+            color: white;
+            border: none;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            margin-left: 10px;
+            flex-shrink: 0;
+            transition: background-color 0.2s;
+        }
+        
+        .send-btn:hover {
+            background-color: #064942;
+        }
+        
+        .send-btn:disabled {
+            background-color: #aaa;
+            cursor: not-allowed;
+        }
+        
+        .toggle-container {
+            display: flex;
+            align-items: center;
+            padding: 0 10px;
+        }
+        
+        .toggle-label {
+            margin-right: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            display: inline-block;
+            width: 44px;
+            height: 22px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 22px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 18px;
+            width: 18px;
+            left: 2px;
+            bottom: 2px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+        
+        input:checked + .toggle-slider {
+            background-color: var(--whatsapp-header);
+        }
+        
+        input:checked + .toggle-slider:before {
+            transform: translateX(22px);
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* Mobile responsiveness */
+        @media (max-width: 768px) {
+            .message {
+                max-width: 80%;
+            }
+            
+            .chat-header h1 {
+                font-size: 16px;
+            }
+            
+            .thread-info {
+                font-size: 12px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="app-container">
+        <div class="chat-header">
+            <h1>Rory for ASVZ(AI)</h1>
+            <div class="thread-info" style="font-size: 5px;">
+                <span class="thread-info-label">Thread:</span>
+                <span id="current-thread-id">None</span>
+                <button class="new-thread-btn" id="new-thread-btn" style="margin-left: 10px;">New</button>
+            </div>
+        </div>
+        
+        <div class="chat-container">
+            <div class="chat-messages" id="chat-messages">
+                <div class="message assistant-message">
+                    <div class="message-content">Hello! How can I help you today?</div>
+                    <span class="message-timestamp" id="welcome-timestamp"></span>
+                </div>
+            </div>
+        </div>
+        
+        <div class="controls-area">
+            <div class="toggle-container">
+                <span class="toggle-label">Streaming Mode:</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="streaming-toggle">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            
+            <div class="thread-controls">
+                <input type="text" id="thread-id" placeholder="Enter Thread ID (optional)">
+                <button id="use-thread-btn">Use Thread</button>
+            </div>
+            
+            <div class="input-area">
+                <textarea id="user-input" placeholder="Type a message" rows="1"></textarea>
+                <button class="send-btn" id="send-btn">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <line x1="22" y1="2" x2="11" y2="13"></line>
+                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Set up marked.js options
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && hljs.getLanguage(lang)) {
+                    return hljs.highlight(code, { language: lang }).value;
+                } else {
+                    return hljs.highlightAuto(code).value;
+                }
+            },
+            breaks: true,
+            gfm: true,
+            headerIds: false,
+            mangle: false,
+            smartLists: true
+        });
+        
+        const chatMessages = document.getElementById('chat-messages');
+        const userInput = document.getElementById('user-input');
+        const sendBtn = document.getElementById('send-btn');
+        const threadIdInput = document.getElementById('thread-id');
+        const useThreadBtn = document.getElementById('use-thread-btn');
+        const newThreadBtn = document.getElementById('new-thread-btn');
+        const currentThreadIdSpan = document.getElementById('current-thread-id');
+        const streamingToggle = document.getElementById('streaming-toggle');
+        const welcomeTimestamp = document.getElementById('welcome-timestamp');
+        
+        let currentThreadId = null;
+        let isStreaming = false;
+        let currentStreamingMessageEl = null;
+        let currentTypingTimeout = null;
+        let typingSpeed = 10; // ms per character
+        
+        // Set welcome timestamp
+        welcomeTimestamp.textContent = formatTimestamp(new Date());
+        
+        // Auto-resize textarea as user types
+        userInput.addEventListener('input', function() {
+            this.style.height = 'auto';
+            this.style.height = (this.scrollHeight > 100 ? 100 : this.scrollHeight) + 'px';
+        });
+        
+        // Format timestamp
+        function formatTimestamp(date) {
+            return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        }
+        
+        // Function to add a typing indicator
+        function addTypingIndicator() {
+            const indicatorDiv = document.createElement('div');
+            indicatorDiv.classList.add('message', 'assistant-message');
+            indicatorDiv.id = 'typing-indicator';
+            
+            const indicatorContent = document.createElement('div');
+            indicatorContent.classList.add('typing-indicator');
+            indicatorContent.innerHTML = '<span></span><span></span><span></span>';
+            
+            indicatorDiv.appendChild(indicatorContent);
+            chatMessages.appendChild(indicatorDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+            
+            return indicatorDiv;
+        }
+        
+        // Function to remove typing indicator
+        function removeTypingIndicator() {
+            const indicator = document.getElementById('typing-indicator');
+            if (indicator) {
+                indicator.remove();
+            }
+        }
+        
+        // Function to add a message to the chat
+        function addMessage(content, isUser = false, animate = false) {
+            // Clear any existing typing timeouts
+            if (currentTypingTimeout) {
+                clearTimeout(currentTypingTimeout);
+                currentTypingTimeout = null;
+            }
+            
+            // If we're adding a new message and we have a streaming message element, finalize it
+            if (currentStreamingMessageEl && !animate) {
+                // Remove cursor from existing streaming message
+                const cursor = currentStreamingMessageEl.querySelector('.cursor-blink');
+                if (cursor) cursor.remove();
+                currentStreamingMessageEl = null;
+            }
+            
+            // Create message containers
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('message');
+            messageDiv.classList.add(isUser ? 'user-message' : 'assistant-message');
+            
+            const contentDiv = document.createElement('div');
+            contentDiv.classList.add('message-content');
+            
+            // Add timestamp
+            const timestampSpan = document.createElement('span');
+            timestampSpan.classList.add('message-timestamp');
+            timestampSpan.textContent = formatTimestamp(new Date());
+            
+            if (isUser) {
+                // User messages are plain text
+                contentDiv.textContent = content;
+            } else if (animate) {
+                // Assistant messages with animation get a special container for typing effect
+                const typewriterDiv = document.createElement('div');
+                typewriterDiv.classList.add('typewriter-text');
+                
+                // Add blinking cursor
+                const cursorSpan = document.createElement('span');
+                cursorSpan.classList.add('cursor-blink');
+                
+                contentDiv.appendChild(typewriterDiv);
+                contentDiv.appendChild(cursorSpan);
+                
+                // Store reference to the streaming message element
+                currentStreamingMessageEl = contentDiv;
+            } else {
+                // Regular assistant messages rendered as markdown
+                contentDiv.innerHTML = marked.parse(content);
+                
+                // Apply syntax highlighting to code blocks
+                contentDiv.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
+            
+            messageDiv.appendChild(contentDiv);
+            messageDiv.appendChild(timestampSpan);
+            chatMessages.appendChild(messageDiv);
+            
+            // Smooth scroll to bottom
+            chatMessages.scrollTo({
+                top: chatMessages.scrollHeight,
+                behavior: 'smooth'
+            });
+            
+            return contentDiv;
+        }
+        
+        // Function to update streaming message with character-by-character animation
+        function updateStreamingMessage(content, speed = typingSpeed) {
+            if (!currentStreamingMessageEl) return;
+            
+            const typewriterEl = currentStreamingMessageEl.querySelector('.typewriter-text');
+            if (!typewriterEl) return;
+            
+            // Get the parsed HTML content
+            const htmlContent = marked.parse(content);
+            
+            // Parse HTML to get text content for typing effect
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = htmlContent;
+            const textContent = tempDiv.textContent;
+            
+            // Get current text and find what's new
+            const currentLength = typewriterEl.textContent.length;
+            
+            // If nothing new to type, just return
+            if (currentLength >= textContent.length) {
+                typewriterEl.innerHTML = htmlContent;
+                
+                // Apply syntax highlighting to code blocks
+                typewriterEl.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+                return;
+            }
+            
+            // Type the next character
+            function typeNextChar(index) {
+                if (index <= textContent.length) {
+                    // Simulate typing by using substrings of increasing length
+                    const textToType = textContent.substring(0, index);
+                    
+                    // To maintain formatting, we'll use the HTML but only show part of it
+                    typewriterEl.innerHTML = htmlContent;
+                    
+                    // Apply syntax highlighting to code blocks
+                    typewriterEl.querySelectorAll('pre code').forEach((block) => {
+                        hljs.highlightElement(block);
+                    });
+                    
+                    // If we have more to type, schedule the next character
+                    if (index < textContent.length) {
+                        currentTypingTimeout = setTimeout(() => {
+                            typeNextChar(index + 1);
+                        }, speed);
+                    }
+                }
+            }
+            
+            // Start typing from where we left off
+            typeNextChar(currentLength + 1);
+            
+            // Smooth scroll to bottom as content is added
+            chatMessages.scrollTo({
+                top: chatMessages.scrollHeight,
+                behavior: 'smooth'
+            });
+        }
+        
+        // Function to finalize a streaming message
+        function finalizeStreamingMessage() {
+            if (currentStreamingMessageEl) {
+                const cursor = currentStreamingMessageEl.querySelector('.cursor-blink');
+                if (cursor) cursor.remove();
+                currentStreamingMessageEl = null;
+            }
+            
+            if (currentTypingTimeout) {
+                clearTimeout(currentTypingTimeout);
+                currentTypingTimeout = null;
+            }
+        }
+        
+        // Function to set current thread ID and update UI
+        function setCurrentThreadId(threadId) {
+            currentThreadId = threadId;
+            currentThreadIdSpan.textContent = threadId || 'None';
+            
+            if (threadId) {
+                // Set the thread ID in the input field and disable it
+                threadIdInput.value = threadId;
+                threadIdInput.disabled = true;
+                useThreadBtn.disabled = true;
+            } else {
+                // Clear and enable the thread ID input
+                threadIdInput.value = '';
+                threadIdInput.disabled = false;
+                useThreadBtn.disabled = false;
+            }
+        }
+        
+        // Function to send a message with streaming
+        async function sendMessageStreaming(message) {
+            addMessage(message, true);
+            
+            // Disable the send button while streaming
+            sendBtn.disabled = true;
+            isStreaming = true;
+            
+            try {
+                // Add typing indicator
+                const typingIndicator = addTypingIndicator();
+                
+                const response = await fetch('/api/ask-stream', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        question: message,
+                        thread_id: currentThreadId
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+                
+                // Create empty streaming message but don't append it yet
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message', 'assistant-message');
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.classList.add('message-content');
+                
+                const typewriterDiv = document.createElement('div');
+                typewriterDiv.classList.add('typewriter-text');
+                
+                const cursorSpan = document.createElement('span');
+                cursorSpan.classList.add('cursor-blink');
+                
+                contentDiv.appendChild(typewriterDiv);
+                contentDiv.appendChild(cursorSpan);
+                
+                const timestampSpan = document.createElement('span');
+                timestampSpan.classList.add('message-timestamp');
+                timestampSpan.textContent = formatTimestamp(new Date());
+                
+                messageDiv.appendChild(contentDiv);
+                messageDiv.appendChild(timestampSpan);
+                
+                // Remove typing indicator and THEN add our prepared message
+                typingIndicator.remove();
+                chatMessages.appendChild(messageDiv);
+                
+                // Set the streaming message element reference
+                currentStreamingMessageEl = contentDiv;
+                
+                // Now start processing the response stream
+                const reader = response.body.getReader();
+                const decoder = new TextDecoder();
+                let buffer = '';
+                
+                while (true) {
+                    const { value, done } = await reader.read();
+                    
+                    if (done) {
+                        break;
+                    }
+                    
+                    buffer += decoder.decode(value, { stream: true });
+                    
+                    // Fix for concatenated JSON objects: split by possible JSON boundaries
+                    const jsonObjects = buffer.match(/\{.*?\}\{?/g) || [];
+                    
+                    // Process each JSON-like string found
+                    for (const jsonStr of jsonObjects) {
+                        try {
+                            // Try to find a complete JSON object
+                            const endPos = jsonStr.lastIndexOf('}') + 1;
+                            if (endPos > 0) {
+                                const completeJson = jsonStr.substring(0, endPos);
+                                
+                                // Remove this processed JSON from the buffer
+                                const startPos = buffer.indexOf(completeJson);
+                                if (startPos !== -1) {
+                                    buffer = buffer.substring(0, startPos) + buffer.substring(startPos + completeJson.length);
+                                }
+                                
+                                // Parse and process the JSON
+                                const data = JSON.parse(completeJson);
+                                
+                                if (data.type === 'update') {
+                                    // Update with typing animation
+                                    updateStreamingMessage(data.content);
+                                } else if (data.type === 'done') {
+                                    // Finalize the message
+                                    updateStreamingMessage(data.content);
+                                    finalizeStreamingMessage();
+                                    
+                                    // Update thread ID if needed
+                                    if (data.thread_id && (!currentThreadId || currentThreadId !== data.thread_id)) {
+                                        setCurrentThreadId(data.thread_id);
+                                    }
+                                } else if (data.type === 'error') {
+                                    finalizeStreamingMessage();
+                                    addMessage(`Error: ${data.content}`, false);
+                                }
+                            }
+                        } catch (parseError) {
+                            console.error('Error parsing message:', parseError, jsonStr);
+                        }
+                    }
+                }
+                
+            } catch (error) {
+                finalizeStreamingMessage();
+                removeTypingIndicator();
+                addMessage(`Error: ${error.message}`, false);
+                console.error('Error sending message:', error);
+            } finally {
+                // Re-enable the send button
+                sendBtn.disabled = false;
+                isStreaming = false;
+                userInput.value = '';
+                userInput.style.height = 'auto';
+                userInput.focus();
+            }
+        }
+        
+        // Function to send a message without streaming
+        async function sendMessageNonStreaming(message) {
+            addMessage(message, true);
+            
+            // Disable send button
+            sendBtn.disabled = true;
+            
+            try {
+                // Show typing indicator
+                const typingIndicator = addTypingIndicator();
+                
+                const response = await fetch('/api/ask', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        question: message,
+                        thread_id: currentThreadId
+                    })
+                });
+                
+                if (!response.ok) {
+                    throw new Error(`API error: ${response.status}`);
+                }
+                
+                const data = await response.json();
+                
+                // Create the message elements but don't append yet
+                const messageDiv = document.createElement('div');
+                messageDiv.classList.add('message', 'assistant-message');
+                
+                const contentDiv = document.createElement('div');
+                contentDiv.classList.add('message-content');
+                
+                const typewriterDiv = document.createElement('div');
+                typewriterDiv.classList.add('typewriter-text');
+                
+                const cursorSpan = document.createElement('span');
+                cursorSpan.classList.add('cursor-blink');
+                
+                contentDiv.appendChild(typewriterDiv);
+                contentDiv.appendChild(cursorSpan);
+                
+                const timestampSpan = document.createElement('span');
+                timestampSpan.classList.add('message-timestamp');
+                timestampSpan.textContent = formatTimestamp(new Date());
+                
+                messageDiv.appendChild(contentDiv);
+                messageDiv.appendChild(timestampSpan);
+                
+                // Remove typing indicator and THEN add our prepared message
+                typingIndicator.remove();
+                chatMessages.appendChild(messageDiv);
+                
+                // Set the streaming message element reference
+                currentStreamingMessageEl = contentDiv;
+                
+                // Simulate streaming by typing the response character by character
+                const content = data.response;
+                let currentIndex = 0;
+                
+                function typeCharacter() {
+                    if (currentIndex <= content.length) {
+                        updateStreamingMessage(content.substring(0, currentIndex));
+                        currentIndex++;
+                        
+                        // Random typing speed between 5ms and 15ms per character for natural feel
+                        const randomSpeed = Math.floor(Math.random() * 10) + 5;
+                        setTimeout(typeCharacter, randomSpeed);
+                    } else {
+                        // Finalize the message when done typing
+                        finalizeStreamingMessage();
+                        
+                        // Update thread ID if needed
+                        if (data.thread_id && (!currentThreadId || currentThreadId !== data.thread_id)) {
+                            setCurrentThreadId(data.thread_id);
+                        }
+                    }
+                }
+                
+                // Start the typing effect
+                typeCharacter();
+                
+            } catch (error) {
+                removeTypingIndicator();
+                addMessage(`Error: ${error.message}`, false);
+                console.error('Error sending message:', error);
+            } finally {
+                // Re-enable the send button
+                sendBtn.disabled = false;
+                userInput.value = '';
+                userInput.style.height = 'auto';
+                userInput.focus();
+            }
+        }
+        
+        // Function to send a message, choosing between streaming and non-streaming
+        function sendMessage(message) {
+            if (streamingToggle.checked) {
+                sendMessageStreaming(message);
+            } else {
+                sendMessageNonStreaming(message);
+            }
+        }
+        
+        // Event listeners
+        sendBtn.addEventListener('click', () => {
+            const message = userInput.value.trim();
+            if (message && !isStreaming) {
+                sendMessage(message);
+            }
+        });
+        
+        userInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey && !isStreaming) {
+                e.preventDefault();
+                const message = userInput.value.trim();
+                if (message) {
+                    sendMessage(message);
+                }
+            }
+        });
+        
+        useThreadBtn.addEventListener('click', () => {
+            const threadId = threadIdInput.value.trim();
+            if (threadId) {
+                setCurrentThreadId(threadId);
+                addMessage(`Now using thread: ${threadId}`, false);
+            }
+        });
+        
+        newThreadBtn.addEventListener('click', () => {
+            setCurrentThreadId(null);
+            addMessage('Started a new conversation thread.', false);
+        });
+
+        // Focus on the user input field on page load
+        window.onload = function() {
+            userInput.focus();
+        };
+
+        // Add this after your variable declarations
+        document.addEventListener('DOMContentLoaded', function() {
+            // Ensure streaming mode starts disabled
+            streamingToggle.checked = false;
+            
+            // You might want to add a visual indicator that streaming is off
+            const toggleLabel = document.querySelector('.toggle-label');
+            toggleLabel.textContent = 'Streaming Mode: Off';
+            
+            // Update label when toggle changes
+            streamingToggle.addEventListener('change', function() {
+                toggleLabel.textContent = this.checked ? 'Streaming Mode: On' : 'Streaming Mode: Off';
+            });
+        });
+    </script>
+</body>
+</html>
