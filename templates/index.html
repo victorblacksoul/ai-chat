@@ -709,13 +709,14 @@
         async function sendMessageStreaming(message) {
             addMessage(message, true);
             
-            // Disable the send button while streaming
+            // Disable both input and send button while streaming
             sendBtn.disabled = true;
+            userInput.disabled = true;  // Disable the input field too
             isStreaming = true;
             
             try {
                 // Add typing indicator
-                const typingIndicator = addTypingIndicator();
+                addTypingIndicator();
                 
                 const response = await fetch('/api/ask-stream', {
                     method: 'POST',
@@ -732,37 +733,10 @@
                     throw new Error(`API error: ${response.status}`);
                 }
                 
-                // Create empty streaming message but don't append it yet
-                const messageDiv = document.createElement('div');
-                messageDiv.classList.add('message', 'assistant-message');
+                // Remove typing indicator and add streaming message
+                removeTypingIndicator();
+                addMessage('', false, true);
                 
-                const contentDiv = document.createElement('div');
-                contentDiv.classList.add('message-content');
-                
-                const typewriterDiv = document.createElement('div');
-                typewriterDiv.classList.add('typewriter-text');
-                
-                const cursorSpan = document.createElement('span');
-                cursorSpan.classList.add('cursor-blink');
-                
-                contentDiv.appendChild(typewriterDiv);
-                contentDiv.appendChild(cursorSpan);
-                
-                const timestampSpan = document.createElement('span');
-                timestampSpan.classList.add('message-timestamp');
-                timestampSpan.textContent = formatTimestamp(new Date());
-                
-                messageDiv.appendChild(contentDiv);
-                messageDiv.appendChild(timestampSpan);
-                
-                // Remove typing indicator and THEN add our prepared message
-                typingIndicator.remove();
-                chatMessages.appendChild(messageDiv);
-                
-                // Set the streaming message element reference
-                currentStreamingMessageEl = contentDiv;
-                
-                // Now start processing the response stream
                 const reader = response.body.getReader();
                 const decoder = new TextDecoder();
                 let buffer = '';
@@ -825,8 +799,9 @@
                 addMessage(`Error: ${error.message}`, false);
                 console.error('Error sending message:', error);
             } finally {
-                // Re-enable the send button
+                // Re-enable both the send button and input field
                 sendBtn.disabled = false;
+                userInput.disabled = false;  // Re-enable the input field
                 isStreaming = false;
                 userInput.value = '';
                 userInput.style.height = 'auto';
@@ -838,12 +813,13 @@
         async function sendMessageNonStreaming(message) {
             addMessage(message, true);
             
-            // Disable send button
+            // Disable both send button and input field
             sendBtn.disabled = true;
+            userInput.disabled = true;  // Disable the input field
             
             try {
                 // Show typing indicator
-                const typingIndicator = addTypingIndicator();
+                addTypingIndicator();
                 
                 const response = await fetch('/api/ask', {
                     method: 'POST',
@@ -862,35 +838,11 @@
                 
                 const data = await response.json();
                 
-                // Create the message elements but don't append yet
-                const messageDiv = document.createElement('div');
-                messageDiv.classList.add('message', 'assistant-message');
+                // Remove typing indicator
+                removeTypingIndicator();
                 
-                const contentDiv = document.createElement('div');
-                contentDiv.classList.add('message-content');
-                
-                const typewriterDiv = document.createElement('div');
-                typewriterDiv.classList.add('typewriter-text');
-                
-                const cursorSpan = document.createElement('span');
-                cursorSpan.classList.add('cursor-blink');
-                
-                contentDiv.appendChild(typewriterDiv);
-                contentDiv.appendChild(cursorSpan);
-                
-                const timestampSpan = document.createElement('span');
-                timestampSpan.classList.add('message-timestamp');
-                timestampSpan.textContent = formatTimestamp(new Date());
-                
-                messageDiv.appendChild(contentDiv);
-                messageDiv.appendChild(timestampSpan);
-                
-                // Remove typing indicator and THEN add our prepared message
-                typingIndicator.remove();
-                chatMessages.appendChild(messageDiv);
-                
-                // Set the streaming message element reference
-                currentStreamingMessageEl = contentDiv;
+                // Add empty message with animation placeholder
+                addMessage('', false, true);
                 
                 // Simulate streaming by typing the response character by character
                 const content = data.response;
@@ -908,10 +860,14 @@
                         // Finalize the message when done typing
                         finalizeStreamingMessage();
                         
-                        // Update thread ID if needed
+                        // Update thread ID if we got a new one
                         if (data.thread_id && (!currentThreadId || currentThreadId !== data.thread_id)) {
                             setCurrentThreadId(data.thread_id);
                         }
+                        
+                        // Re-enable input and send button
+                        sendBtn.disabled = false;
+                        userInput.disabled = false;
                     }
                 }
                 
@@ -922,9 +878,12 @@
                 removeTypingIndicator();
                 addMessage(`Error: ${error.message}`, false);
                 console.error('Error sending message:', error);
-            } finally {
-                // Re-enable the send button
+                
+                // Re-enable input and send button on error
                 sendBtn.disabled = false;
+                userInput.disabled = false;
+            } finally {
+                // Clear the input field and reset its height
                 userInput.value = '';
                 userInput.style.height = 'auto';
                 userInput.focus();
